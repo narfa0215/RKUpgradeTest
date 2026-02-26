@@ -6,7 +6,7 @@ namespace RKUpgradeTest
 {
     internal class Program
     {
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        [StructLayout(LayoutKind.Sequential)]
         public struct INIT_DEV_INFO
         {
             public bool bScan4FsUsb;
@@ -25,8 +25,8 @@ namespace RKUpgradeTest
             public uint emSupportDevice;
         }
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-        public struct INIT_LOG_INFO
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct INIT_LOG_INFO_W
         {
             public bool bLogEnable;
             public string lpszLogPathName;
@@ -39,8 +39,8 @@ namespace RKUpgradeTest
             public IntPtr pProgressPromptProc;
         }
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-        public struct STRUCT_DEVICE_DESC_A
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct STRUCT_DEVICE_DESC_W
         {
             public ushort usVid;
             public ushort usPid;
@@ -57,20 +57,20 @@ namespace RKUpgradeTest
             public bool bUsb20;
         }
 
-        [DllImport("RKUpgrade.dll", EntryPoint = "RK_InitializeA",
-            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+        [DllImport("RKUpgrade.dll", EntryPoint = "RK_InitializeW",
+            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Unicode)]
         public static extern bool RK_Initialize(
             INIT_DEV_INFO devInfo,
-            INIT_LOG_INFO logInfo,
+            INIT_LOG_INFO_W logInfo,
             INIT_CALLBACK_INFO cbInfo
         );
 
-        [DllImport("RKUpgrade.dll", EntryPoint = "RK_ScanDeviceA",
-            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+        [DllImport("RKUpgrade.dll", EntryPoint = "RK_ScanDeviceW",
+            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Unicode)]
         public static extern int RK_ScanDevice(out IntPtr ppDevs);
 
         [DllImport("RKUpgrade.dll", EntryPoint = "RK_ReadVendorRpmbData",
-            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Unicode)]
         public static extern bool RK_ReadVendorRpmbData(
             ushort nID,               // 数据 ID
             byte dest,                // 0=Vendor, 1=RPMB
@@ -80,7 +80,7 @@ namespace RKUpgradeTest
         );
 
         [DllImport("RKUpgrade.dll", EntryPoint = "RK_WriteVendorRpmbData",
-            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Unicode)]
         public static extern bool RK_WriteVendorRpmbData(
             ushort nID,               // 数据 ID
             byte dest,                // 0=Vendor, 1=RPMB
@@ -90,7 +90,7 @@ namespace RKUpgradeTest
         );
         
         [DllImport("RKUpgrade.dll", EntryPoint = "RK_Uninitialize",
-            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Unicode)]
         public static extern bool RK_Uninitialize();
         
         public static T[] PtrToStructArray<T>(IntPtr ptr, int count) where T : struct
@@ -122,7 +122,7 @@ namespace RKUpgradeTest
                 usRockusbVid = 0
             };
 
-            INIT_LOG_INFO logInfo = new INIT_LOG_INFO
+            INIT_LOG_INFO_W logInfo = new INIT_LOG_INFO_W
             {
                 bLogEnable = false,
                 lpszLogPathName = null
@@ -155,7 +155,7 @@ namespace RKUpgradeTest
             }
 
             // 转换成 C# 数组
-            var devices = PtrToStructArray<STRUCT_DEVICE_DESC_A>(pDevices, nDeviceCount);
+            var devices = PtrToStructArray<STRUCT_DEVICE_DESC_W>(pDevices, nDeviceCount);
 
             foreach (var dev in devices)
             {
