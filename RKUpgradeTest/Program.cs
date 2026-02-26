@@ -89,6 +89,10 @@ namespace RKUpgradeTest
             uint dwLayer = 0          // 设备层 (默认0)
         );
         
+        [DllImport("RKUpgrade.dll", EntryPoint = "RK_Uninitialize",
+            CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+        public static extern bool RK_Uninitialize();
+        
         public static T[] PtrToStructArray<T>(IntPtr ptr, int count) where T : struct
         {
             int size = Marshal.SizeOf(typeof(T));
@@ -199,6 +203,16 @@ namespace RKUpgradeTest
             
             string readNewSn = System.Text.Encoding.ASCII.GetString(newSnBuffer, 0, newSnBufferLen);
             Console.WriteLine("Read new SN: " + readNewSn);
+            
+            // 释放已初始化资源
+            bool uninitializeOk = RK_Uninitialize();
+            if (!uninitializeOk)
+            {
+                Console.WriteLine("Failed to uninitialize.");
+                return;
+            }
+            
+            Console.WriteLine("Completion!");
             
             
         }
