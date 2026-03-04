@@ -7,88 +7,6 @@ namespace RKUpgradeTest
 {
     internal class Program
     {
-        // 进度窗口类
-        public class ProgressForm : Form
-        {
-            private ProgressBar progressBar;
-            private Label statusLabel;
-            private System.Windows.Forms.Timer closeTimer;
-            
-            public ProgressForm()
-            {
-                InitializeComponent();
-            }
-            
-            private void InitializeComponent()
-            {
-                this.progressBar = new ProgressBar();
-                this.statusLabel = new Label();
-                this.closeTimer = new System.Windows.Forms.Timer();
-                this.SuspendLayout();
-                
-                // 设置窗口属性
-                this.Text = "固件升级进度";
-                this.Size = new Size(400, 150);
-                this.StartPosition = FormStartPosition.CenterScreen;
-                this.FormBorderStyle = FormBorderStyle.FixedSingle;
-                this.MaximizeBox = false;
-                this.MinimizeBox = false;
-                
-                // 进度条
-                this.progressBar.Location = new Point(20, 60);
-                this.progressBar.Size = new Size(350, 20);
-                this.progressBar.Minimum = 0;
-                this.progressBar.Maximum = 100;
-                this.progressBar.Value = 0;
-                
-                // 状态标签
-                this.statusLabel.Location = new Point(20, 20);
-                this.statusLabel.Size = new Size(350, 30);
-                this.statusLabel.Text = "准备固件升级...";
-                this.statusLabel.TextAlign = ContentAlignment.MiddleCenter;
-                
-                // 关闭定时器
-                this.closeTimer.Interval = 3000; // 3秒
-                this.closeTimer.Tick += new EventHandler(closeTimer_Tick);
-                
-                // 添加控件
-                this.Controls.Add(this.progressBar);
-                this.Controls.Add(this.statusLabel);
-                this.ResumeLayout(false);
-            }
-            
-            public void UpdateProgress(int progress, string status)
-            {
-                if (this.InvokeRequired)
-                {
-                    this.Invoke(new Action<int, string>(UpdateProgress), progress, status);
-                }
-                else
-                {
-                    this.progressBar.Value = progress;
-                    this.statusLabel.Text = status;
-                }
-            }
-            
-            public void StartCloseTimer()
-            {
-                if (this.InvokeRequired)
-                {
-                    this.Invoke(new Action(StartCloseTimer));
-                }
-                else
-                {
-                    this.closeTimer.Start();
-                }
-            }
-            
-            private void closeTimer_Tick(object sender, EventArgs e)
-            {
-                this.closeTimer.Stop();
-                this.Close();
-            }
-        }
-
         public static void Main(string[] args)
         {
             DeviceManager deviceManager = new DeviceManager();
@@ -222,8 +140,13 @@ namespace RKUpgradeTest
         public static bool UpgradeFirmware(string firmwarePath)
         {
             // 创建进度窗口
-            ProgressForm progressForm = new ProgressForm();
-            Task progressFormTask = Task.Run(() => Application.Run(progressForm));
+            FirmwareUpgradeProgress firmwareUpgradeProgress = new FirmwareUpgradeProgress();
+            Task progressFormTask = Task.Run(() =>
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(firmwareUpgradeProgress);
+            });
             
             // 创建升级管理器
             RKUpgradeManager upgradeManager = new RKUpgradeManager();
@@ -231,12 +154,12 @@ namespace RKUpgradeTest
             // 订阅进度更新事件
             upgradeManager.ProgressUpdated += (progress, status) =>
             {
-                progressForm.UpdateProgress(progress, status);
+                firmwareUpgradeProgress.UpdateProgress(progress, status);
                 
                 // 当进度达到100%时，启动关闭定时器
                 if (progress >= 100)
                 {
-                    progressForm.StartCloseTimer();
+                    firmwareUpgradeProgress.StartCloseTimer();
                 }
             };
             
@@ -245,7 +168,7 @@ namespace RKUpgradeTest
             upgradeManager.UpgradeCompleted += (isSuccess, message) =>
             {
                 upgradeResult[0] = isSuccess;
-                progressForm.StartCloseTimer();
+                firmwareUpgradeProgress.StartCloseTimer();
             };
             
             // 执行升级
