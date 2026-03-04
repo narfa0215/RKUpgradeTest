@@ -608,6 +608,8 @@ namespace RKUpgradeTest
                 string.Empty);
         }
         
+        private static string _latestResult = string.Empty;
+        
         // 存储输出结果，用于判断升级是否成功
         private static readonly ConcurrentQueue<string> ResultQueue = new ConcurrentQueue<string>();
 
@@ -634,6 +636,12 @@ namespace RKUpgradeTest
                         {
                             string output = Encoding.ASCII.GetString(buffer, 0, (int)bytesRead);
                             string clean = Regex.Replace(StripAnsiEscapeCodes(output), @"(\r\n){2,}", "\r\n");
+                            string latestResult = Volatile.Read(ref _latestResult);
+                            if (latestResult.EndsWith("\r\n") && clean.StartsWith("\r\n"))
+                            {
+                                clean = clean.Substring(2);
+                            }
+                            Interlocked.Exchange(ref _latestResult, clean);
                             Console.Write(clean);
                             ResultQueue.Enqueue(clean);
                         }
