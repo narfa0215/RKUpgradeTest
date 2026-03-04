@@ -7,11 +7,95 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Drawing;
 
 namespace RKUpgradeTest
 {
     internal class Program
     {
+        // 进度窗口类
+        public class ProgressForm : Form
+        {
+            private ProgressBar progressBar;
+            private Label statusLabel;
+            private System.Windows.Forms.Timer closeTimer;
+            
+            public ProgressForm()
+            {
+                InitializeComponent();
+            }
+            
+            private void InitializeComponent()
+            {
+                this.progressBar = new ProgressBar();
+                this.statusLabel = new Label();
+                this.closeTimer = new System.Windows.Forms.Timer();
+                this.SuspendLayout();
+                
+                // 设置窗口属性
+                this.Text = "固件升级进度";
+                this.Size = new Size(400, 150);
+                this.StartPosition = FormStartPosition.CenterScreen;
+                this.FormBorderStyle = FormBorderStyle.FixedSingle;
+                this.MaximizeBox = false;
+                this.MinimizeBox = false;
+                
+                // 进度条
+                this.progressBar.Location = new Point(20, 60);
+                this.progressBar.Size = new Size(350, 20);
+                this.progressBar.Minimum = 0;
+                this.progressBar.Maximum = 100;
+                this.progressBar.Value = 0;
+                
+                // 状态标签
+                this.statusLabel.Location = new Point(20, 20);
+                this.statusLabel.Size = new Size(350, 30);
+                this.statusLabel.Text = "准备固件升级...";
+                this.statusLabel.TextAlign = ContentAlignment.MiddleCenter;
+                
+                // 关闭定时器
+                this.closeTimer.Interval = 3000; // 3秒
+                this.closeTimer.Tick += new EventHandler(closeTimer_Tick);
+                
+                // 添加控件
+                this.Controls.Add(this.progressBar);
+                this.Controls.Add(this.statusLabel);
+                this.ResumeLayout(false);
+            }
+            
+            public void UpdateProgress(int progress, string status)
+            {
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action<int, string>(UpdateProgress), progress, status);
+                }
+                else
+                {
+                    this.progressBar.Value = progress;
+                    this.statusLabel.Text = status;
+                }
+            }
+            
+            public void StartCloseTimer()
+            {
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(StartCloseTimer));
+                }
+                else
+                {
+                    this.closeTimer.Start();
+                }
+            }
+            
+            private void closeTimer_Tick(object sender, EventArgs e)
+            {
+                this.closeTimer.Stop();
+                this.Close();
+            }
+        }
+        
         [StructLayout(LayoutKind.Sequential)]
         public struct INIT_DEV_INFO
         {
@@ -612,6 +696,13 @@ namespace RKUpgradeTest
         
         // 存储输出结果，用于判断升级是否成功
         private static readonly ConcurrentQueue<string> ResultQueue = new ConcurrentQueue<string>();
+        
+        // 升级状态信息
+        private static string _currentStatus = string.Empty;
+        private static int _currentProgress = 0;
+        private static bool _showProgressUI = false;
+        private static ProgressForm _progressForm = null;
+        private static Task _progressFormTask = null;
 
         private static void ReadOutputAsync(IntPtr hOutputRead, CancellationToken cancellationToken)
         {
@@ -644,6 +735,9 @@ namespace RKUpgradeTest
                             Interlocked.Exchange(ref _latestResult, clean);
                             Console.Write(clean);
                             ResultQueue.Enqueue(clean);
+                            
+                            // 解析升级状态和进度
+                            ParseUpgradeInfo(clean);
                         }
                     }
                     else
@@ -659,6 +753,130 @@ namespace RKUpgradeTest
             }
         }
         
+        private static void ParseUpgradeInfo(string output)
+        {
+            // 解析状态信息
+            if (output.Contains("Starting firmware upgrade"))
+            {
+                _currentStatus = "开始固件升级...";
+                _currentProgress = 0;
+                _showProgressUI = true;
+            }
+            else if (output.Contains("Loading firmware"))
+            {
+                _currentStatus = "加载固件中...";
+            }
+            else if (output.Contains("Support Type"))
+            {
+                _currentStatus = "固件信息已加载";
+            }
+            else if (output.Contains("Loader ver"))
+            {
+                _currentStatus = "加载器信息已加载";
+            }
+            else if (output.Contains("Start to upgrade firmware"))
+            {
+                _currentStatus = "开始固件升级过程";
+            }
+            else if (output.Contains("Test Device Start"))
+            {
+                _currentStatus = "正在测试设备...";
+            }
+            else if (output.Contains("Test Device Success"))
+            {
+                _currentStatus = "设备测试通过";
+                _currentProgress = 10;
+            }
+            else if (output.Contains("Check Chip Start"))
+            {
+                _currentStatus = "正在检查芯片...";
+            }
+            else if (output.Contains("Check Chip Success"))
+            {
+                _currentStatus = "芯片检查通过";
+                _currentProgress = 20;
+            }
+            else if (output.Contains("Get FlashInfo Start"))
+            {
+                _currentStatus = "正在获取闪存信息...";
+            }
+            else if (output.Contains("Get FlashInfo Success"))
+            {
+                _currentStatus = "已获取闪存信息";
+                _currentProgress = 30;
+            }
+            else if (output.Contains("Prepare IDB Start"))
+            {
+                _currentStatus = "正在准备IDB...";
+            }
+            else if (output.Contains("Prepare IDB Success"))
+            {
+                _currentStatus = "IDB准备完成";
+                _currentProgress = 40;
+            }
+            else if (output.Contains("Download IDB Start"))
+            {
+                _currentStatus = "正在下载IDB...";
+            }
+            else if (output.Contains("Download IDB Success"))
+            {
+                _currentStatus = "IDB下载完成";
+                _currentProgress = 50;
+            }
+            else if (output.Contains("Download Firmware Start"))
+            {
+                _currentStatus = "正在下载固件...";
+            }
+            else if (output.Contains("Download Image..."))
+            {
+                // 解析下载进度
+                Match match = Regex.Match(output, @"Download Image\.\.\. \((\d+)%\)");
+                if (match.Success)
+                {
+                    int progress = int.Parse(match.Groups[1].Value);
+                    _currentProgress = 50 + (progress / 2); // 50% 到 100%
+                    _currentStatus = $"正在下载固件... {progress}%";
+                }
+            }
+            else if (output.Contains("Download Firmware Success"))
+            {
+                _currentStatus = "固件下载成功";
+                _currentProgress = 100;
+            }
+            else if (output.Contains("Upgrade firmware ok"))
+            {
+                _currentStatus = "固件升级成功完成！";
+            }
+            
+            // 更新进度界面
+            if (_showProgressUI)
+            {
+                UpdateProgressUI();
+            }
+        }
+        
+        private static void UpdateProgressUI()
+        {
+            if (_progressForm != null)
+            {
+                _progressForm.UpdateProgress(_currentProgress, _currentStatus);
+                
+                // 当进度达到100%时，启动关闭定时器
+                if (_currentProgress >= 100)
+                {
+                    _progressForm.StartCloseTimer();
+                }
+            }
+        }
+        
+        private static void StartCloseTimer()
+        {
+            if (_progressForm != null)
+            {
+                _progressForm.StartCloseTimer();
+            }
+        }
+        
         /// <summary>
         /// 执行固件升级
         /// </summary>
@@ -666,6 +884,18 @@ namespace RKUpgradeTest
         /// <returns>升级是否成功</returns>
         public static bool UpgradeFirmware(string firmwarePath)
         {
+            // 初始化进度状态
+            _currentStatus = "准备固件升级...";
+            _currentProgress = 0;
+            _showProgressUI = true;
+            
+            // 创建并显示进度窗口
+            _progressForm = new ProgressForm();
+            _progressFormTask = Task.Run(() => Application.Run(_progressForm));
+            
+            // 显示初始进度界面
+            UpdateProgressUI();
+            
             int exitCode = RunProcessWithConPTY("upgrade_tool.exe", $"uf \"{firmwarePath}\"");
             // 判断升级是否成功
             // 成功条件：包含"Upgrade firmware ok"
@@ -675,6 +905,36 @@ namespace RKUpgradeTest
             {
                 // 每次取出一个元素并丢弃
             }
+            
+            // 根据升级结果更新状态
+            if (success)
+            {
+                _currentStatus = "固件升级成功完成！";
+                _currentProgress = 100;
+            }
+            else
+            {
+                _currentStatus = "固件升级失败！";
+            }
+            
+            // 更新进度界面
+            UpdateProgressUI();
+            
+            // 启动关闭定时器（无论成功或失败都启动）
+            StartCloseTimer();
+            
+            // 等待进度窗口关闭
+            if (_progressFormTask != null)
+            {
+                _progressFormTask.Wait();
+            }
+            
+            // 重置进度状态
+            _currentStatus = string.Empty;
+            _currentProgress = 0;
+            _showProgressUI = false;
+            _progressForm = null;
+            _progressFormTask = null;
 
             return exitCode == 0 && success;
         }
