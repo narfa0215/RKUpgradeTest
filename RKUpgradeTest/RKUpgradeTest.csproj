@@ -51,6 +51,7 @@
         <Compile Include="ConPTYHelper.cs" />
         <Compile Include="RKUpgradeManager.cs" />
         <Compile Include="DeviceManager.cs" />
+        <Compile Include="AdbHelper.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>
     <ItemGroup>

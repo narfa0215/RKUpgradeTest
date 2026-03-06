@@ -122,14 +122,24 @@ namespace RKUpgradeTest
             // 执行固件升级
             Console.WriteLine("\nStarting firmware upgrade...");
             bool upgradeSuccess = UpgradeFirmware(@"D:\Temp\update.img");
-            if (upgradeSuccess)
-            {
-                Console.WriteLine("Firmware upgrade completed successfully!");
-            }
-            else
+            if (!upgradeSuccess)
             {
                 Console.WriteLine("Firmware upgrade failed!");
+                return;
             }
+
+            Console.WriteLine("Firmware upgrade completed successfully!");
+            
+            // 执行 ADB 推送
+            Console.WriteLine("Executing ADB push...");
+            bool adbPushSuccess = AdbHelper.ExecuteAdbPush();
+            if (!adbPushSuccess)
+            {
+                Console.WriteLine("ADB push execution failed!");
+                return;
+            }
+
+            Console.WriteLine("ADB push executed successfully!");
         }
         
         /// <summary>
